@@ -13,47 +13,43 @@ DESCRIPTION
 
        Each directory contains a program that teaches a lession.  Begin with
        xhello, as it is teaches the basics of Xlib programming.  All lessons
-       are introductions;  that means that to fully learn their subject, you
+       are introductions;  this means that to fully learn their subject, you
        must refer to the manuals.
 
 FILES
-       xhello
+       xhello/
               Create and display a simple blank window.
               Lesson: Introduction to Xlib programming.
 
-       xcount
+       xcount/
               A counter window that counts button presses.
               Lesson: Introduction to event handling.
 
-       xpaint1
+       xpaint1/
               A paint-like program, with a serious bug.
               Lesson: Introduction to drawing and graphics context.
 
-       xpaint2
+       xpaint2/
               A paint-like program.
               Lesson: Introduction to pixmaps.
 
-       xwindow
+       xwindow/
               Create and display a simple blank window with title.
               Lesson: Introduction to X Properties and window hints.
 
-       xmenu
+       xmenu/
               A menu window.
               Lesson: Introduction to override-redirect, atoms and EWMH.
 
-       xcircle
+       xcircle/
               Create and display a simple round window.
               Lesson: Introduction to X Shape.
 
-       xread
+       xread/
               A window that reads the characters the user types and print them.
               Lesson: Introduction to X Input Method.
 
-       xwrite
-              A window that writes on a window the string passed as argument.
-              Lesson: Introduction to Xft.
-
-       xwrite
+       xwrite/
               A window that writes on a window the string passed as argument.
               Lesson: Introduction to Xft.
 
