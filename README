@@ -57,6 +57,10 @@ FILES
               A window that writes on a window the string passed as argument.
               Lesson: Introduction to Xft.
 
+BUGS
+       Some paragraphs were copied as is from other sources when I was
+       learning how to program using Xlib.  I need to fix that.
+
 SEE ALSO
        Guy Keren, Basic Graphics Programming With The Xlib Library.
 
