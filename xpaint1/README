@@ -1,0 +1,151 @@
+XPAINT(1)                           X Notes                          XPAINT(1)
+
+NAME
+       xpaint - paint lines with the mouse
+
+SYNOPSIS
+       xpaint
+
+DESCRIPTION
+       This program displays a blank window.  Pressing the left mouse button
+       and moving the pointer draws a line on the window.
+
+       The objective of this program is to understand and apply the basic
+       concepts about graphics context and drawing functions.
+
+CONCEPTS
+       Using Xlib functions we can draw lines, polygons, rectangles, circles,
+       and several other stuff on our windows.  There are two concepts we need
+       to know that are related to drawing: the graphics context and the
+       drawing functions.
+
+   Graphics Context
+       There are several variables that control how to stuff should be drawn:
+       the foreground color, the background color, the width of the lines we
+       draw, how the lines connect to each other, etc.  Rather than supplying
+       all those variables to the drawing functions, we create a graphics
+       context.
+
+       A graphics context, of type GC, is a resource that specifies all the
+       details for the drawing functions.  We create a graphics context with
+       the XCreateGC(3) function.  This function receives the pointer to the
+       Display structure; a drawable (we'll talk about drawables in another
+       lesson), which, for our purposes, is the same as a Window; and a
+       pointer to a structure containing the various options of our graphics
+       context and a bitwise inclusive OR of the members of this structure
+       that we have set.
+
+       The window we must pass to XCreateGC(3) is used for the function to get
+       the color depth of the window.  We can pass the root window or any
+       window that has the same depth and the same root window as the one
+       we want to draw on.
+
+       We can create a default graphics context by passing the value mask as
+       zero and the pointer as NULL.  But in our program, we have specified
+       the graphics context by ourselves.  We create a XGCValues structure and
+       fill its members with the values we want.  The following list specifies
+       some members of this structure and their respective mask in parentheses.
+       Read the man page for XCreateGC(3) for more information on the members
+       of this structure, their meaning, and their corresponding mask.
+
+       .foreground (GCForeground)
+              The foreground color.
+
+       .background (GCBackground)
+              The background color.
+
+       .cap_style (GCCapStyle)
+              How the tip of a line is drawn.  Its value can be CapButt (the
+              line tip is square), CapRound (The line tip is round), or
+              CapProjecting (the line tip is a square and projects beyond
+              the tip).
+
+       .join_style (GCJoinStyle)
+              How the corners between two straight lines are drawn.  Its value
+              can be JoinMiter (lines extend to meet at an angle), JoinRound
+              (the corner is a circular arc), or JoinBevel (the corner has a
+              triangular notch filled).
+
+       .fill_style (GCFillStyle)
+              How shapes are filled.  Its value can be FillSolid (paint
+              with the foreground color), FillTiled (tile), or FillStippled
+              (foreground masked by stiple).
+
+       .line_style (GCLineStyle)
+              How lines are drawn.  Its value can be LineSolid (the full path
+              of the line is drawn), LineDoubleDash (the full path of the line
+              is drawn, but the even dashes are filled differently from the
+              odd dashes), or LineOnOffDash (only the even dashes are drawn).
+
+       .line_width (GCLineWidth)
+              The width of the line.
+
+       Experiment changing the values of those members in the code of xpaint
+       to see how it affects the drawing.
+
+   Drawing functions
+       For most of the primitives (lines, points, rectangles, etc.) that can
+       be drawn, there is a singular function (to draw a single object), and
+       a plural function (to draw a set of objects).  For example, we can draw
+       a single line with XDrawLine(3) or several points with XDrawLines(3).
+       Each plural function receives a pointer to an array of structures that
+       specify the each object to be drawn.  For example, XDrawPoints(3)
+       receives a pointer to an array of a XPoint structure, which has only
+       two members, an x and a y integers.
+
+       For some primitives (mostly shapes) there is a Draw- function, that only
+       draws the outline of the shape, and a Fill- function that draws a filled
+       shape.  For example, XDrawRectangle(3) only draws the outline of a
+       rectangle, while XFillRectangle(3) draws the outline of a rectangle and
+       fill its inner part.  Some primitives, like points and lines do not
+       have a Fill- function.
+
+       The table below lists the singular drawing functions, their plural form,
+       and the manual for them.
+
+       ┌────────────────────┬────────────────────┬────────────────────┬────────────────────┐
+       │ Singular Draw-     │ Plural draw-       │ Singular Fill-     │ Plural Fill-       │
+       ╞════════════════════╪════════════════════╪════════════════════╪════════════════════╡
+       │ XDrawPoint(3)      │ XDrawPoints(3)     │ -                  │ -                  │
+       ├────────────────────┼────────────────────┼────────────────────┼────────────────────┤
+       │ XDrawLine(3)       │ XDrawLines(3)      │ -                  │ -                  │
+       ├────────────────────┼────────────────────┼────────────────────┼────────────────────┤
+       │ -                  │ -                  │ XFillPolygon(3)    │ -                  │
+       ├────────────────────┼────────────────────┼────────────────────┼────────────────────┤
+       │ XDrawArc(3)        │ XDrawArcs(3)       │ XFillArc(3)        │ XFillArcs(3)       │
+       ├────────────────────┼────────────────────┼────────────────────┼────────────────────┤
+       │ XDrawRectangle(3)  │ XDrawRectangles(3) │ XFillRectangle(3)  │ XFillRectangles(3) │
+       └────────────────────┴────────────────────┴────────────────────┴────────────────────┘
+
+   Changing a Graphics Context
+       After we have created a graphics context, we can change some of its
+       attributes with the following functions.
+
+       XSetLineAttributes(3)
+              This function can be used to change the attributes related to
+              line drawing (line width, line style, cap style, and join
+              style).
+
+       XSetForeground(3)
+              This function can be used to change the foreground color.
+
+       XSetBackground(3)
+              This function can be used to change the background color.
+
+ENVIRONMENT
+       The following environment variables affect the execution of xpaint.
+
+       DISPLAY
+              The display to start xnotify on.
+
+BUGS
+       Whenever another window covers the xpaint window, the drawing in the
+       region covered is lost.  We will fix this problem in another version.
+
+       We have not dealt with text drawing.  That's because we will use
+       another library for drawing text with TrueType fonts.  To know how
+       to draw text with Xlib, see the code for xcount.
+
+SEE ALSO
+       XCreateGC(3), XSetLineAttributes(3), XSetForeground(3),
+       XSetBackground(3)

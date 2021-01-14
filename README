@@ -1,0 +1,66 @@
+XNOTES(1)                           X Notes                          NOTESO(1)
+
+NAME
+       xnotes - some notes on Xlib programming
+
+DESCRIPTION
+       This is a collection of programs and notes I wrote back when I was
+       learning how to program X11 clients, and some notes I am adding to help
+       people who is learning how to program using the Xlib library.  You can
+       use these notes to help your learning, but don't use them as the only
+       sources.  I recomment you to use Guy Keren's tutorial and Adrian Nye's
+       book (and the man pages, of course).
+
+       Each directory contains a program that teaches a lession.  Begin with
+       xhello, as it is teaches the basics of Xlib programming.  All lessons
+       are introductions;  that means that to fully learn their subject, you
+       must refer to the manuals.
+
+FILES
+       xhello
+              Create and display a simple blank window.
+              Lesson: Introduction to Xlib programming.
+
+       xcount
+              A counter window that counts button presses.
+              Lesson: Introduction to event handling.
+
+       xpaint1
+              A paint-like program, with a serious bug.
+              Lesson: Introduction to drawing and graphics context.
+
+       xpaint2
+              A paint-like program.
+              Lesson: Introduction to pixmaps.
+
+       xwindow
+              Create and display a simple blank window with title.
+              Lesson: Introduction to X Properties and window hints.
+
+       xmenu
+              A menu window.
+              Lesson: Introduction to override-redirect, atoms and EWMH.
+
+       xcircle
+              Create and display a simple round window.
+              Lesson: Introduction to X Shape.
+
+       xread
+              A window that reads the characters the user types and print them.
+              Lesson: Introduction to X Input Method.
+
+       xwrite
+              A window that writes on a window the string passed as argument.
+              Lesson: Introduction to Xft.
+
+       xwrite
+              A window that writes on a window the string passed as argument.
+              Lesson: Introduction to Xft.
+
+SEE ALSO
+       Guy Keren, Basic Graphics Programming With The Xlib Library.
+
+       Adrian Nye, Xlib Programming Manual, O'Reilly Media, 1992,
+       ISBN 1-56592-002-3.
+
+       https://venam.nixers.net/blog/unix/2018/05/10/reparenting-redirecting-composition-rendering.html

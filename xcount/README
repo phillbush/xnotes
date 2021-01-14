@@ -1,0 +1,202 @@
+XCOUNT(1)                           X Notes                          XCOUNT(1)
+
+NAME
+       xcount - count with the mouse
+
+SYNOPSIS
+       xcount
+
+DESCRIPTION
+       This program displays a window with a number written on it.  Clicking
+       on the window with the left mouse button increments this number by one.
+       Clicking on the window with the middle mouse button resets this number
+       to zero.  Clicking on the window with the right mouse button decrements
+       this number by one.  Pressing the key Q on the keyboard closes the
+       window.
+
+       The objective of this program is to understand and apply the basic
+       concepts about event handling.
+
+CONCEPTS
+       Let's ignore the draw function, what it does is to clear the window and
+       draw a string on it.  Let's concentrate on the function running the
+       event loop and how it handle events.
+
+       X programs use an asynchronous programming model called “event-driven
+       programming”.   This means that the program mostly sits idle, waiting
+       for events sent by the X server, and then acts upon these events.  An
+       event may say “the user pressed the 1st mouse button in spot x,y”, or
+       “the window you control needs to be redrawn”.
+
+       Xlib stores received events in a queue.  Clients can inspect and
+       retrieve events from the queue.  While the X server sends events,
+       clients must explicitly call functions for accessing the events
+       in the queue.  Some of these functions may block; in this case,
+       they also flush the output buffer.
+
+       There are various kinds of events.  An event can be the result of an
+       input by the user, such as clicking on the window with the mouse, or
+       pressing a key on the keyboard while the window is focused (a window
+       must have focus in order to receive keyboard events).   An event can
+       also be the result of a window manipulation by the user, for example,
+       restacking windows (moving a window so it uncovers the one below it)
+       generates an expose event for the window that becames uncovered.
+
+   Registering for Events
+       First, the client application must inform what kind of events it wants
+       to receive for what windows.   To do this, the client must register for
+       events on those windows.  Applications can register for events on a
+       window at the time the window is created with XCreateWindow(3); or
+       after it has been created using the XSelectInput(3) function.
+
+       Multiple client applications can register for the same events on the
+       same window with the following restrictions:
+
+       • Multiple clients can select events on the same window because their
+         event masks are disjoint.  When the X server generates an event, it
+         reports it to all interested clients.
+
+       • Only one client at a time can select CirculateRequest, MapRequest, or
+         ConfigureRequest events, which are associated with the event mask
+         SubstructureRedirectMask.
+
+       • Only one client at a time can select a ResizeRequest event, which is
+         associated with the event mask ResizeRedirectMask.
+
+       • Only one client at a time can select a ButtonPress event, which is
+         associated with the event mask ButtonPressMask.
+
+       The server reports the event to all interested clients.
+
+   Handling Events
+       After we have registered for the event types we are interested in, we
+       need to enter a loop of receiving events and handling them.  This loop
+       is blocked by a call to XNextEvent(3), which fetches the first event
+       from the event queue into the specified XEvent structure and then
+       removes it from the queue.  If the event queue is empty, XNextEvent(3)
+       flushes the output buffer and blocks until an event is received.  This
+       function always returns zero.
+
+       This is the general form of a event loop.
+
+              XEvent ev;
+
+              while (XNextEvent(dpy, &ev) == 0) {
+                      switch(ev.type) {
+                      case Expose:
+                              ...;
+                              break;
+                      case ButtonPress:
+                              ...;
+                              break;
+                      case KeyPress:
+                              ...;
+                              break;
+                      ...
+                      }
+              }
+
+       The XEvent object filled by XNextEvent is a union of structures for all
+       possible event types.  The type member specifies the type of the event
+       received.  For each event type there is a structure member of this
+       union containing the data associated with the event.  All structure
+       members have a .window member whose value is the identifier for the
+       window that received the event.
+
+       For example, if the value of the .type member of a XEvent is the
+       constant ButtonPress, then .xbutton is filled with data related to the
+       button press: .xbutton.window is the window that received the button
+       press, .xbutton.button is the button that was pressed (Button1,
+       Button2, etc); .xbutton.x and .xbutton.y are the positions on the
+       window in wich the pointer was at the time of the button press;
+       .xbutton.window is the identifier of the window that suffered the
+       button press; etc.
+
+       Check the manual for each event to know the members of the structure
+       member associated to it on the XEvent union.
+
+   Table of events
+       The table below lists the events.  The first column is the constant
+       value that the type member can have and that indicates the event type.
+       The second column is the name of the structure member on the XEvent
+       union that contains the data associated with the event.  The third
+       column is the event mask that should be used while register for the
+       event type.  The fourth column is the manual for the event type.
+
+       ┌───────────────┬───────────────┬───────────────────┬──────────────────────┐
+       │ Event type    │ XEvent member │ Event Mask        │ Manual page          │
+       ╞═══════════════╪═══════════════╪═══════════════════╪══════════════════════╡
+       │ Expose        │ xexpose       │ ExposureMask      │ XExposeEvent(3)      │
+       ├───────────────┼───────────────┼───────────────────┼──────────────────────┤
+       │ ButtonPress   │               │ ButtonPressMask   │                      │
+       ├───────────────┤               ├───────────────────┤ XButtonEvent(3)      │
+       │ ButtonRelease │               │ ButtonReleaseMask │                      │
+       ├───────────────┤               ├───────────────────┼──────────────────────┤
+       │               │               │ PointerMotionMask │                      │
+       │               │ xbutton       │ ButtonMotionMask  │                      │
+       │               │               │ Button1MotionMask │                      │
+       │ MotionNotify  │               │ Button2MotionMask │ XMotionEvent(3)      │
+       │               │               │ Button3MotionMask │                      │
+       │               │               │ Button4MotionMask │                      │
+       │               │               │ Button5MotionMask │                      │
+       ├───────────────┼───────────────┼───────────────────┼──────────────────────┤
+       │ FocusIn       │               │ FocusChangeMask   │                      │
+       ├───────────────┤ xfocus        ├───────────────────┤ XFocusChangeEvent(3) │
+       │ FocusOut      │               │ FocusChangeMask   │                      │
+       ├───────────────┼───────────────┼───────────────────┼──────────────────────┤
+       │ EnterNotify   │               │ EnterWindowMask   │                      │
+       ├───────────────┤ xcrossing     ├───────────────────┤ XCrossingEvent(3)    │
+       │ LeaveNotify   │               │ LeaveWindowMask   │                      │
+       ├───────────────┼───────────────┼───────────────────┼──────────────────────┤
+       │ KeyPress      │               │ KeyPressMask      │                      │
+       ├───────────────┤ xkey          ├───────────────────┤ XKeyEvent(3)         │
+       │ KeyRelease    │               │ KeyReleaseMask    │                      │
+       └───────────────┴───────────────┴───────────────────┴──────────────────────┘
+
+   xcount events
+       In the xcount program, we deal with three different types of events.
+       Read the manual for all those events.
+
+       Expose Event
+              We registered for Expose events using the ExposureMask bit mask.
+              Thus, we receive an Expose event whenever the window is exposed
+              (when it is mapped or when another window uncovers it, for
+              example).  Whenever a window is covered, it loses everything
+              that was drawn on it; so we must respond to this event by
+              redrawing the window.  The fields .x and .y are the top-left
+              coordinate of the window region that was exposed and needs to be
+              redrawn.  The fields .width and .height are the size of this
+              region.  The field .count is the number of other expose events
+              waiting in the event queue.  We can respond to events of this
+              type in two ways: first responding to each event by redrawing
+              each region that needs to be redrawn; or responding to a single
+              expose event (the one whose .count is 0, we ignore the others)
+              by redrawing the entire window (and thus all the regions that
+              needs to be redrawn).
+
+       Button Event
+              We registered for ButtonPress events using the ButtonPressMask
+              bit mask.  Thus, we receive a ButtonPress event whenever the
+              user press a mouse button on our window.  The .button field is
+              the button that was pressed.  The .x and .y fields are the
+              coordinates (in pixels) of the button press.
+
+       Key Event
+              We registered for KeyPress events using the KeyPressMask bit
+              mask.  Thus, we receive a KeyPress event whenever the user press
+              a key on our window.  The .keycode is the keycode of the button.
+              Keycodes are mapped to actual key symbols, which correspond to
+              the symbols in our keyboard.  We can translate keycodes to key
+              symbols with XkbKeycodeToKeysym(3).  In our case, we exit from
+              the loop whenever the user press the key corresponding to the
+              keysym XK_q (the Q key).
+
+
+ENVIRONMENT
+       The following environment variables affect the execution of xcount.
+
+       DISPLAY
+              The display to start xnotify on.
+
+SEE ALSO
+       XNextEvent(3), XExposeEvent(3), XButtonEvent(3), XKeyEvent(3)

@@ -1,0 +1,113 @@
+XPAINT(1)                           X Notes                          XPAINT(1)
+
+NAME
+       xpaint - paint lines with the mouse
+
+SYNOPSIS
+       xpaint
+
+DESCRIPTION
+       This program displays a blank window.  Pressing the left mouse button
+       and moving the pointer draws a line on the window.
+
+       The objective of this program is to understand and apply the basic
+       concepts about graphics context and drawing functions.
+
+CONCEPTS
+       This version of xpaint fixes a bug of the previous version.  In the
+       previous version, whenever another window covers the xpaint window,
+       the drawing in the region covered is lost.
+
+       That occurred because, for saving memory, the X server does not save
+       the contents of each window.  Instead, it saves the content of the
+       screen.  If a window is not visible on the screen, its content is lost.
+       In fact, when we draw on a window we are actually drawing directly on
+       the screen.
+
+       To save what we have drawn, we need to draw into a pixmap, and then
+       copy the contents of the pixmap to the window whenever it receives an
+       expose event.
+
+   The Expose Event
+       To get Expose events on a window, we need to register for it using the
+       ExposureMask bit mask.  Then, we'll receive an Expose event whenever
+       the window is exposed (that is, when it is mapped or when another
+       window uncovers it, for example).
+
+       We usually respond to this event by redrawing everything that was lost.
+
+   Pixmaps
+       A pixmap is like an image that is stored in the X server.  Both pixmaps
+       and windows are called drawables.  The drawing functions actually draw
+       on drawables, so it can draw directly on a window or on a pixmap.  The
+       difference is that the contents of a pixmap is saved on the X server,
+       and is not lost until we destroy the pixmap.
+
+       A pixmap is created with the the XCreatePixmap(3) function.  This
+       function receives a pointer to the Display structure, another drawable,
+       the width and height of the pixmap we want to create, and a color
+       depth.  The drawable we must pass to XCreateGC(3) is used for the
+       function to get the screen on which the pixmap will be drawn.  We
+       can pass the root window or the window into which the contents of
+       the pixmap will be copied to.
+
+       The pixmap often comes with garbage in it.  So it is a good idea to
+       fill the pixmap with a blank rectangle (or a rectangle with the color
+       of our background).  To do this, we temporarily set the foreground of
+       our graphics context to our background color, draw a rectangle covering
+       all the pixmap, and then revert the graphics context to its previous
+       state.
+
+   Copying pixmap to window
+       We can copy the contents of an drawable to another.  To do this, we
+       use the XCopyArea(3) function.  In our case, we copy the contents of
+       the pixmap we are drawing in to the window that we see on the screen.
+
+       The XCopyArea(3) function receives several arguments.  The first
+       argument, as always, is a pointer to the Display structure.  The second
+       and third arguments are the source and destination drawables.  The
+       fourth argument is the graphics context.  The fifth and sixth arguments
+       are the coordinate of the top-left point of the region on the source
+       drawable that should be copied.  The seventh and eighth arguments
+       specify the size of this region.  And the ninth and tenth arguments are
+       the coordinate of the top-left point on the destination drawable that
+       we want to copy that region to.
+
+       As we can see, we can copy only a certain rectangular region of a
+       drawable into another.  That's what we do in this second version of
+       xpaint.  We only copy the exposed region.  Since the pixmap has the
+       same size of the window, the source and destination coordinates are
+       the same.
+
+   Free Pixmap
+       After we have used our pixmap, we must destroy it on the X server with
+       the XFreePixmap(3) function.
+
+   Double-buffering
+       It is a good practice to always draw on a pixmap rather than directly
+       on the window.  This is called double-buffering.  When we draw directly
+       on the window, we can see glitches during redrawing.  Using double
+       buffering avoids it.
+
+ENVIRONMENT
+       The following environment variables affect the execution of xpaint.
+
+       DISPLAY
+              The display to start xnotify on.
+
+BUGS
+       The window can change size, but we created a pixmap with the initial
+       size of the window.  That means that, when we resize the window, the
+       pixmap maintains its size and we can only draw in the upper left part
+       of the window with the same size as the pixmap.
+
+       As an exercise, try to fix this.  Search about the ConfigureNotify
+       event, which notifies whenever a window changes its configuration (such
+       as its size).  Register for this event and, whenever you receive it,
+       create a new pixmap with size larger enough to fit into the window and
+       to get the contents of the older pixmap.  Then copy the contents of the
+       old pixmap into the newer one, and use the newer one as your canvas.
+       Remember to free the older pixmap.
+
+SEE ALSO
+       XCreatePixmap(3), XFreePixmap(3), XCopyArea(3), XConfigureEvent(3)

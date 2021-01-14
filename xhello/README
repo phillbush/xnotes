@@ -1,0 +1,265 @@
+XHELLO(1)                           X Notes                          XHELLO(1)
+
+NAME
+       xhello - create and display a simple window
+
+SYNOPSIS
+       xhello
+
+DESCRIPTION
+       This program is a simple X11 “hello world” program.  It creates and
+       displays a basic window with default white background.  Clicking on
+       the window will close the application.
+
+       The objective of this program is to understand and apply the basic
+       concepts about X11 programming.
+
+CONCEPTS
+       The basic structure of a X11 program can be divided in seven steps, as
+       we can see in the main() function in the source code of xhello.
+
+   1. Open connection to the server.
+       The first thing our application needs to do is to open the connection
+       with the server.  But before showing how to do that, we need to
+       understand how the client-server model works.
+
+       The X11 system uses a client-server model.   The programs we create are
+       called clients, and they have to communicate with the server.   Actions
+       (such as creating a window or drawing into the window) are performed by
+       the server, not by our application.  What our client does is to request
+       the server to perform a certain action.
+
+       The functions that send requests to the server usually do not send them
+       immediately but store them in a buffer, called the output buffer.   The
+       output buffer is guaranteed to be flushed after a call to the functions
+       Xsync(3) or XFlush(3),  after a call to a function that returns a value
+       from the server (these functions block until the answer is received),
+       and in some other conditions.
+
+       When a client application connects to the server, it must do so by
+       specifying a display.  A display is to the X11 system what a terminal
+       is to the underlying operating system.  It is a collection of screens
+       and input devices (a pointer and a keyboard). Displays are controlled
+       by the X server.
+
+       Now that we understand what the client-server model is, how the client
+       perform (or requests for) actions and what a display is, we can open a
+       connection to the server.  We need to use the function XOpenDisplay(3)
+       to do this.   It receives a single argument and returns a pointer to a
+       Display structure.
+
+       The argument XOpenDisplay(3) receives is a string (char *) specifying
+       the address to the X server host and the number of the display device
+       to be used.  We set this value to NULL so it defaults to the value of
+       the DISPLAY environment variable.
+
+       The XOpenDisplay(3) function returns a pointer to a Display structure.
+       This structure represents the connection we have open with the server.
+       It hides the output buffer and the event queue (we'll talk about the
+       event queue later).  If it fails to connect to the server, it returns
+       NULL.
+
+       We should not access members of this structure directly, instead we
+       should use some macros that get values from it.  The following is a
+       summary of some of those macros.  See the manual for them for more
+       information (there is a single manual for all those macros).
+
+       DefaultScreen(3)
+              Returns the default screen number of the display.  Usually a
+              display has only one screen.  Screen is the area into which
+              graphics may be rendered.  A screen does not maps directly
+              to a phisical monitor, as a screen may be a collection of
+              monitors.
+
+       DisplayWidth(3), DisplayHeight(3)
+              Returns the width and height of a screen.  (The names of these
+              macros are misleading, they should be called ScreenWidth and
+              ScreenHeight, since they return the size of the screen). In a
+              multimonitor display, the screen width may be the sum of the
+              monitors width if they are oriented horizontally, one next to
+              the other; and the screen height may be the sum of the monitors
+              height if they are oriented vertically, one above the other.
+
+       RootWindow(3)
+              Returns the identifier for the root window of a screen.  We will
+              talk about resource identifiers and windows later.   Each screen
+              has a root window that covers the whole screen.
+
+       DefaultColormap(3)
+              Returns the identifier for the default colormap of a screen.  We
+              will talk about resource identifiers later.  A color map is the
+              table of colors allocated for drawing on a drawable resource.
+
+       DefaultVisual(3)
+              Returns a pointer to the structure for the default visual type
+              of a screen.  A visual structure contains information about the
+              various types of display hardware in determining the way pixels
+              are translated into visible colors.  For example, it specifies
+              whether we have a gray scale or true color screen.
+
+       DefaultDepth(3)
+              Returns the default color depth of a screen.  It specifies the
+              number of bits (or planes) used to represent a color index in
+              the color map.  The number of colors is 2 to the power of this
+              depth.
+
+       BlackPixel(3), WhitePixel(3)
+              Returns the black and white pixel values for the specified
+              screen.
+
+       DisplayString(3)
+              Returns the string that was passed to XOpenDisplay(3) when the
+              current display was opened.  It is useful to applications that
+              invoke fork(2).
+
+       Most Xlib functions requires the pointer to the Display as an argument,
+       in order to send a request to the server.  Others may also require as
+       argument an identifier returned by one of those macros.  Since these
+       values are required by so many functions, it is usual to store them in
+       global variables, rather than in local variables.
+
+   2. Create resources and other objects.
+       Resources (such as windows) are not stored in our application's memory,
+       and our application does not manage them directly.  Instead, resources
+       are managed and stored by the server.   A client operates on resources
+       using the identifier to the resource, requesting the server to perform
+       the operation on it.
+
+       When we request the X server to create an resource for us, the relevant
+       function returns an integer, called “handler” or “identifier”, for that
+       resource.   The resource actually resides in the X server's memory, not
+       in our application's memory.   We can later manipulate this resource by
+       supplying this identifier to various functions.  The server keeps a
+       mapping between these identifiers and the actual resources it manages.
+
+       There are other kinds of objects that are stored in our client, such as
+       a structure containing information about a resource.  Those objects are
+       managed and stored by our client, and we must free them with XFree(3)
+       or another function explicitly specified for the object.
+
+       The most important resource is a Window.  The creation of a window is
+       requested by the function XCreateWindow(3).  This function receives
+       several arguments, listed below.
+
+       Window geometry.
+              The window geometry is a set of integer values such as the X and
+              Y position of the window, its width and height, and the size of
+              its border.  These values may not dictate the final geometry of
+              the window.  The window manager can change these values for, for
+              instance, make the window fit on the screen or place it in a
+              certain position on the screen.
+
+       Parent window.
+              The windows in X11 exist in an hierarchical system.  Each window
+              (except for the root window) have a parent window, and can has
+              children windows.  The root window is what appears below other
+              windows; the wallpaper is normally drawn on the root window.
+              A window that is a child of the root window is said to be a
+              “top-level window”, they are the regular windows managed by
+              the window manager.
+
+       Depth, class and visual.
+              Those arguments specify the depth, visual and class of a window;
+              these values are assigned when the window is created, and cannot
+              be changed.  There are two classes of windows: InputOutput and
+              InputOnly.  The main difference between the two classes is that
+              an InputOnly window cannot be used as a drawable (a resource
+              into which we draw stuff).  All those variables can be inherited
+              from the parent window; we just need to specify “CopyFromParent”
+              as the argument for XCreateWindow(3).
+
+       Valuemask and pointer to attribute structure.
+              These two arguments specify the attributes of the window.  The
+              pointer is a pointer to a structure whose members are the
+              attributes of the window; and valuemask is a bitwise inclusive
+              OR of the members of this structure that we have set.
+
+       The attributes we have set for our window are its background color, the
+       the color of its border (the window manager may change this color), and
+       the bitwise OR of the events for which we want to register for (we will
+       talk about events later).  In this case, we register for button presses
+       on the window, so we receive an event when a mouse button is pressed.
+
+       Other attributes we can set are the color or pattern to be used for the
+       border or background; how are partial window contents reallocated
+       during resizing; when are the contents of the window saved as they
+       become covered; whether should the window be allowed to be displayed
+       without being controlled by the window manager (the override-redirect);
+       which colormap should be used to interpret pixel values drawn in the
+       window; which cursor should be displayed when the pointer is on the
+       window; etc.
+
+   3. Map the windows.
+       For a window to appear on the screen, it has to be mapped.  We call the
+       function XMapWindow to request the server to map a given window for us.
+       It does not occur immediately, as we have already seen.  Instead, the
+       request for mapping is stored in the output buffer and it only occurs
+       when we flush the output buffer.
+
+   4. Run the event loop
+       X programs use an asynchronous programming model called “event-driven
+       programming”.   This means that the program mostly sits idle, waiting
+       for events sent by the X server, and then acts upon these events.  An
+       event may say “the user pressed the 1st mouse button in spot x,y”, or
+       “the window you control needs to be redrawn”.
+
+       Xlib stores received events in a queue.  Clients can inspect and
+       retrieve events from the queue.  While the X server sends events,
+       clients must explicitly call functions for accessing the events
+       in the queue.  Some of these functions may block; in this case,
+       they also flush the output buffer.
+
+       All the requests we have done until now (creating the window and
+       mapping it) will not be done until we call XNextEvent(3), which will
+       block until it get an event we have registered for.  As said in the
+       previous paragraph, this kind of function flush the output buffer, so
+       the requests are finally sent to the X server.
+
+       In the case for our program (xhello), we have registered for button
+       press events.  And the way we handle this event is to return from the
+       event loop when we press a mouse button.
+
+   5. Unmap the window
+       After returning from the event loop, we need to do do the cleanup.
+       First we unmap the window for it to not appear on the screen anymore.
+       We do this with the XUnmapWindow(3) function.
+
+       This step is optional, however, because when we request for the window
+       to be destroyed on the server (the next step), it will be automatically
+       unmapped.
+
+   6. Close the created resources and objects
+       Remember that resources reside on the server's memory, not on our
+       client application's memory.  When our program is about to exit, we
+       must request the server to destroy and free those resources.
+
+       There are various functions to close resources.  For windows, we call
+       XDestroyWindow(3).
+
+       In this case, for xhello, this step is optional, because when we close
+       the connection to the X server (the next step), all resources are
+       automatically destroyed.  However, if we have allocated any object on
+       the clients memory, we have to free them with XFree(3) or another
+       appropriate function.
+
+   7. Close the connection to the X server
+       When the program finishes, it needs to close the connection to the X
+       server.  We do this by calling XCloseDisplay(3).
+
+       Calling this function causes all windows created by the program (if any
+       are left) to be automatically closed by the server, and any resources
+       stored on the server on behalf of the client to be freed.
+
+       This function also flushes the output buffer, so any request we have
+       made is performed.
+
+ENVIRONMENT
+       The following environment variables affect the execution of xhello
+
+       DISPLAY
+              The display to start xnotify on.
+
+SEE ALSO
+       XOpenDisplay(3), XCreateWindow(3), RootWindow(3), XMapWindow(3)
+
+       Guy Keren, Basic Graphics Programming With The Xlib Library
