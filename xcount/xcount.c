@@ -91,7 +91,7 @@ main(void)
 
 	/* open connection to the server */
 	if ((dpy = XOpenDisplay(NULL)) == NULL)
-		errx(1, "cannot open display");
+		errx(1, "could not open display");
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
 

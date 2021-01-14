@@ -16,6 +16,12 @@ DESCRIPTION
        are introductions;  this means that to fully learn their subject, you
        must refer to the manuals.
 
+       When you're in a directory, first compile and run the program, for you
+       to understand how it works.  Then read the source code and try to grasp
+       its structure.  Then read the CONCEPTS section of the readme along with
+       the code to understand the main concepts applied in the code and how
+       stuff are implemented.
+
 FILES
        xhello/
               Create and display a simple blank window.
@@ -45,7 +51,7 @@ FILES
               Create and display a simple round window.
               Lesson: Introduction to X Shape.
 
-       xread/
+       xinput/
               A window that reads the characters the user types and print them.
               Lesson: Introduction to X Input Method.
 
