@@ -11,7 +11,7 @@ DESCRIPTION
        and moving the pointer draws a line on the window.
 
        The objective of this program is to understand and apply the basic
-       concepts about graphics context and drawing functions.
+       concepts about pixmaps.
 
 CONCEPTS
        This version of xpaint fixes a bug of the previous version.  In the
