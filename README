@@ -56,7 +56,7 @@ FILES
               Lesson: Introduction to X Input Method.
 
        xwrite/
-              A window that writes on a window the string passed as argument.
+              A window that displays the string passed as argument.
               Lesson: Introduction to Xft.
 
 BUGS
@@ -68,5 +68,8 @@ SEE ALSO
 
        Adrian Nye, Xlib Programming Manual, O'Reilly Media, 1992,
        ISBN 1-56592-002-3.
+
+       Xlib - C Language X Interface
+       https://www.x.org/releases/current/doc/libX11/libX11/libX11.html
 
        https://venam.nixers.net/blog/unix/2018/05/10/reparenting-redirecting-composition-rendering.html
