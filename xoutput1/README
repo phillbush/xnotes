@@ -1,0 +1,185 @@
+XOUTPUT(1)                          X Notes                         XOUTPUT(1)
+
+NAME
+       xoutput - display text on window
+
+SYNOPSIS
+       xoutput string
+
+DESCRIPTION
+       xoutput displays a window containing the text passed as argument
+       centered in it.  xoutput reads only one argument, so remember to quote
+       a string containing spaces for the shell to not break it into several
+       arguments.
+
+       The window can be closed by clicking on it.
+
+       The objective of this program is to understand and apply the basic
+       concepts about drawing UTF-8 text using the core X11 font system.
+
+CONCEPTS
+       X11 has two font system: the older core X11 font system, and the newer
+       Xft font system.  The core X11 font system originally supported only
+       monochrome bitmap fonts, but now it can deal with scalable fonts.  This
+       older font system, however, does not support features such as
+       anti-aliasing and sub-pixel rasterization, which are desirable to have
+       smooth fonts.  Also, the core X11 font system uses a rather inelegant
+       syntax for selecting fonts called “X Logical Font Description” (XLFD).
+
+       The following is an example of font described with this system:
+
+              -misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1
+
+       The name contains fourteen elements, with each element field preceded
+       by a hyphen, -. Not all elements are required to be present in a font
+       name and a field may be empty. Names can be simplified for the user by
+       the wildcards * and ?.
+
+              -*-dejavu sans mono-medium-r-normal--*-80-*-*-*-*-iso10646-1
+
+       See the sources on the SEE ALSO section to know more about XLFD, and
+       to select fonts with it.
+
+       To draw a string on a drawable (such as a pixmap or a window) we could
+       use the XDrawString(3) drawing function, which uses the font specified
+       on the graphics context we create.  But, with this function, we have
+       trouble displaying strings encoded in UTF-8.  To handle such strings,
+       we'll use a set of functions that can deal with multi-byte encodings
+       such as UTF-8, the one character encoding to rule them all.
+
+       Instead of relying on the font specified in the GC we'll use a set of
+       fonts.  But we still need a graphics context for other stuff, such as
+       foreground and background color.  Check the README of xpaint for more
+       information about graphics context.  To simplify stuff, instead of
+       creating a GC and set its values, this time we will create a GC with
+       default values by calling XCreateGC with a value mask of zero.
+
+       We'll also need to set our locale, as it will be needed when loading
+       the fontset to get the proper character encoding.
+
+   Setting the Locale
+       First, we need to establish the locale.  This is done in two steps:
+       call setlocale(3) to set the locale, and call XSupportsLocale(3) to
+       determine if the Xlib implementation supports the current locale.
+
+       setlocale(3) takes two arguments: a locale category and the locale
+       name.
+
+       The locale category specifies which behaviors of the program
+       should be affected by the locale.  For example, in most operating
+       systems (OpenBSD not included), LC_NUMERIC affects the decimal
+       separator output by printf(3); LC_COLLATE affects how strings are
+       compared with strcoll(3); and so forth.  In our case, we need the
+       behavior set by LC_CTYPE, which affects the character encoding for
+       text output.  In the code we are using LC_ALL, which affects all
+       behaviors, we could have used LC_CTYPE, however.
+
+       The locale name specifies the localization database that should be
+       used to localize the program.  It must be a string of the form
+       “LANGUAGE_TERRITORY.ENCODING”, such as “pt_BR.UTF-8”, or the empty
+       string, which causes setlocale(3) to get the locale name from
+       environment variables such as LC_CTYPE and LC_COLLATE (or LC_ALL,
+       which overrides all the others).
+
+       XSupportsLocale(3) must be called immediatelly after setlocale(3) to
+       determine whether the Xlib implementation supports the current locale.
+       This function takes no argument and returns True if it supports and
+       False otherwise.
+
+   Create the Fontset
+       A fontset is created with XCreateFontSet(3).  This function checks the
+       locale to determine which charsets are required, and loads a set of
+       fonts that supply those charsets.  This function takes a pointer to
+       display (as usual), a string with a list of font names and some
+       pointers to variables to be filled in.
+
+       The font name list is a comma-separated list of wildcarded font names.
+       Generally, you will want to use a very generic font name list, allowing
+       the user to override it.
+
+       The variables filled by this function are a char **, which gets an
+       array of strings specifying the charsets for which no font could be
+       found; an int, which gets the size of that array; and a char *, which
+       gets the default string that will be drawn in place of characters from
+       the missing charsets.
+
+       The list of missing charsets should be freed with a call to
+       XFreeStringList(3).  The returned default string should not be freed.
+
+       The fontset must be destroyed after use with a call to XFreeFontSet(3).
+
+       We can get some metrics from the fonts in the fontset with a call to
+       XExtentsOfFontSet(3).  It takes the fontset as sole argument, and
+       returns a pointer to a XFontSetExtents structure.  This structure
+       should not be freed, as it is used internally by Xlib.
+
+              typedef struct {
+                      XRectangle max_ink_extents;
+                      XRectangle max_logical_extents;
+              } XFontSetExtents;
+
+       A XRectangle contains four integer members: .x, .y, .width and .height.
+       It specifies the upper left corner of a rectangle and a positive width
+       and height.
+
+       The .max_ink_extents rectangle specifies the geometry of all glyphs in
+       all fonts of the fontset.  Note that this geometry is not the size of
+       the largest glyph, but the size large enough to accomodate the largest
+       descent, the largest ascent, and so on.
+
+       The .max_logical_extents is the size of .max_ink_extents plus
+       intercharacter and interline spacing.
+
+   Draw the text
+       To draw text on a Drawable (a Pixmap or a Window) we call the function
+       XmbDrawString(3).  It gets a pointer to a Display, the drawable, the
+       fontset, the graphics context (from which it will get the foreground
+       color, etc), the x and y position of the baseline of the first
+       character, and the string and its length.
+
+              void XmbDrawString(Display *dpy, Drawable d, XFontSet fontset,
+                                 GC gc, int x, int y, char *text, int len);
+
+       Since we want the text to be centered, we need to get the height and
+       width of the text in order to compute its position.  This is done by
+       calling XmbTextExtents(3), which has the following prototype:
+
+              int XmbTextExtents(XFontSet fontset, char *text, int len,
+                                 XRectangle *ink, XRectangle *logical);
+
+       It returns as its value the number of pixels the given string would
+       require in the x dimension if drawn.  It also returns two XRectangles
+       specifying the size of the drawn text.  The second XRectangle contains
+       all the glyphs plus intercharacter and interline spacing.
+
+       Note that those functions begin with Xmb-, the “mb” is for multi-byte,
+       which is what we want for UTF-8 (a multi-byte encoding).  There is also
+       similar functions that begin with Xwc- instead, the “wc” is for
+       wide-character.
+
+       Note that we draw on a Pixmap rather than directly on a Window.  We
+       then copy the Pixmap to our Window whenever we get an Expose event.
+
+ENVIRONMENT
+       The following environment variables affect the execution of xoutput.
+
+       DISPLAY
+              The display to start xnotify on.
+
+       LC_CTYPE
+              Used to get supported character encoding.
+
+BUGS
+       No smooth fonts.
+
+SEE ALSO
+       setlocale(3), XSupportsLocale(3), XCreateFontSet(3),
+       XFreeStringList(3), XFontSetExtents(3), XmbDrawString(3),
+       XmbTextExtents(3)
+
+       Adrian Nye, Xlib Programming Manual, O'Reilly Media, 1992,
+       ISBN 1-56592-002-3.
+
+       https://wiki.archlinux.org/index.php/X_Logical_Font_Description
+
+       https://www.x.org/releases/current/doc/xorg-docs/xlfd/xlfd.html
