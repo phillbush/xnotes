@@ -1,22 +1,26 @@
 #include <err.h>
-#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xft/Xft.h>
 
 #define POSX    200
 #define POSY    200
 #define WIDTH   350
 #define HEIGHT  250
 #define BORDER  10
-#define FONT    "-*-dejavu sans mono-medium-r-normal--*-80-*-*-*-*-iso10646-1"
+
+static char *fontname = "monospace:size=16";
+static char *colorname = "#000000";
 
 static Display *dpy;
+static Visual *visual;
 static Window root;
-static int screen;
+static Colormap colormap;
 static int depth;
+static int screen;
 
 /* setup top-level window */
 static Window
@@ -37,7 +41,6 @@ createwin(int x, int y, int w, int h, int b)
 	return win;
 }
 
-/* create pixmap */
 static Pixmap
 createpix(GC gc, int w, int h)
 {
@@ -56,34 +59,72 @@ createpix(GC gc, int w, int h)
 	return pix;
 }
 
-/* create fontset */
-static XFontSet
-createfontset(const char *fontname)
+/* open font from its name */
+static XftFont *
+openfont(const char *fontname)
 {
-	XFontSet fontset;
-	char **mc;      /* dummy variable; allocated array of missing charsets */
-	int nmc;        /* dummy variable; number of missing charsets */
-	char *ds;       /* dummy variable; default string drawn in place of unknown chars */
+	FcPattern *pattern;
+	FcPattern *match;
+	FcResult result;
+	FcBool status;
+	XftFont *font;
 
-	if ((fontset = XCreateFontSet(dpy, fontname, &mc, &nmc, &ds)) == NULL)
-		errx(1, "XCreateFontSet: could not create fontset");
-	XFreeStringList(mc);
-	return fontset;
+	/* parse pattern */
+	pattern = FcNameParse(fontname);
+	if (pattern == NULL)
+		errx(1 ,"openfont: could not parse font name");
+
+	/* fill in missing items in our pattern */
+	FcDefaultSubstitute(pattern);
+	status = FcConfigSubstitute(NULL, pattern, FcMatchPattern);
+	if (status == FcFalse)
+		errx(1, "openfont: could not perform pattern substitution");
+
+	/* find font matching pattern */
+	match = FcFontMatch(NULL, pattern, &result);
+	if (match == NULL || result != FcResultMatch)
+		errx(1, "openfont: could not find font matching pattern");
+
+	/* open font */
+	font = XftFontOpenPattern(dpy, match);
+	if (font == NULL)
+		errx(1, "openfont: could not open font");
+
+	/* close patterns */
+	FcPatternDestroy(pattern);
+	FcPatternDestroy(match);
+
+	return font;
 }
 
-/* draw text on pixmap using given graphics context and fontset */
+/* allocate color for Xft */
 static void
-draw(Drawable pix, GC gc, XFontSet fontset, const char *text)
+alloccolor(const char *colorname, XftColor *color)
 {
-	XRectangle box, dummy;
-	int x, y;
-	int len;
+	if (!XftColorAllocName(dpy, visual, colormap, colorname, color))
+		errx(1, "could not allocate color");
+}
 
-	len = (int)strlen(text);
-	XmbTextExtents(fontset, text, len, &dummy, &box);
-	x = (WIDTH - box.width) / 2 - box.x;
-	y = (HEIGHT - box.height) / 2 - box.y;
-	XmbDrawString(dpy, pix, fontset, gc, x, y, text, len);
+/* draw text on pixmap */
+static void
+draw(Drawable pix, XftFont *font, XftColor *color, const char *text)
+{
+	XGlyphInfo ext;
+	XftDraw *draw;
+	int x, y;
+	size_t len;
+
+	draw = XftDrawCreate(dpy, pix, visual, colormap);
+
+	len = strlen(text);
+
+	/* get text extents */
+	XftTextExtentsUtf8(dpy, font, text, len, &ext);
+	x = (WIDTH - ext.width) / 2;
+	y = (HEIGHT + ext.height) / 2;
+	XftDrawStringUtf8(draw, color, font, x, y, text, len);
+
+	XftDrawDestroy(draw);
 }
 
 /* enter the event loop */
@@ -110,9 +151,10 @@ run(GC gc, Pixmap pix)
 int
 main(int argc, char *argv[])
 {
-	Window win;
+	XftColor color;
+	XftFont *font;
 	Pixmap pix;
-	XFontSet fontset;
+	Window win;
 	GC gc;
 
 	if (argc != 2) {        /* we need one argument */
@@ -120,14 +162,12 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	/* set locale */
-	if (!setlocale(LC_ALL, "") || !XSupportsLocale())
-		warnx("warning: no locale support");
-
 	/* open connection to the server */
 	if ((dpy = XOpenDisplay(NULL)) == NULL)
 		errx(1, "could not open display");
 	screen = DefaultScreen(dpy);
+	colormap = DefaultColormap(dpy, screen);
+	visual = DefaultVisual(dpy, screen);
 	depth = DefaultDepth(dpy, screen);
 	root = RootWindow(dpy, screen);
 
@@ -135,10 +175,11 @@ main(int argc, char *argv[])
 	win = createwin(POSX, POSY, WIDTH, HEIGHT, BORDER);
 	gc = XCreateGC(dpy, root, 0, NULL);
 	pix = createpix(gc, WIDTH, HEIGHT);
-	fontset = createfontset(FONT);
+	font = openfont(fontname);
+	alloccolor(colorname, &color);
 
 	/* draw argv[1] on the pixmap */
-	draw(pix, gc, fontset, argv[1]);
+	draw(pix, font, &color, argv[1]);
 
 	/* map the window */
 	XMapWindow(dpy, win);
@@ -153,7 +194,8 @@ main(int argc, char *argv[])
 	XDestroyWindow(dpy, win);
 	XFreePixmap(dpy, pix);
 	XFreeGC(dpy, gc);
-	XFreeFontSet(dpy, fontset);
+	XftColorFree(dpy, visual, colormap, &color);
+	XftFontClose(dpy, font);
 
 	/* close connection to the server */
 	XCloseDisplay(dpy);

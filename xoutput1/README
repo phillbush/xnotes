@@ -42,10 +42,11 @@ CONCEPTS
 
        To draw a string on a drawable (such as a pixmap or a window) we could
        use the XDrawString(3) drawing function, which uses the font specified
-       on the graphics context we create.  But, with this function, we have
-       trouble displaying strings encoded in UTF-8.  To handle such strings,
-       we'll use a set of functions that can deal with multi-byte encodings
-       such as UTF-8, the one character encoding to rule them all.
+       on the graphics context we create.  See the source code of xcount(1)
+       for an example of how to use XDrawString(3).   The problem with this
+       function is that we have trouble displaying strings encoded in UTF-8.
+       To handle such strings, we'll use a set of functions that can deal with
+       multi-byte encodings such as UTF-8.
 
        Instead of relying on the font specified in the GC we'll use a set of
        fonts.  But we still need a graphics context for other stuff, such as

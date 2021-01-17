@@ -1,0 +1,218 @@
+XOUTPUT(1)                          X Notes                         XOUTPUT(1)
+
+NAME
+       xoutput - display text on window
+
+SYNOPSIS
+       xoutput string
+
+DESCRIPTION
+       xoutput displays a window containing the text passed as argument
+       centered in it.  xoutput reads only one argument, so remember to quote
+       a string containing spaces for the shell to not break it into several
+       arguments.
+
+       The window can be closed by clicking on it.
+
+       The objective of this program is to understand and apply the basic
+       concepts about drawing UTF-8 text using Xft.
+
+CONCEPTS
+       X11 has two font system: the older core X11 font system, and the newer
+       Xft font system.  The newer Xft font system, unlike the older one,
+       supports features such as anti-aliasing and sub-pixel rasterization.
+       Xft uses another library, called fontconfig, to do font selection and
+       configuration.  This is desirable, because fontconfig does not depend
+       on X11, so fonts can be configured for printing without having X11
+       running.
+
+       Fontconfig does both font configuration (building an configuration from
+       XML files) and font matching (which accepts font patterns and returns
+       the nearest matching font).  We will use its font matching capabilities
+       to get the font that nearest match a pattern string we supply to it.
+       This string is formed by a font family name and some NAME=VALUE pairs
+       preceded by a colon.
+
+              FAMILY:NAME1=VALUE1:NAME2=VALUE2...
+
+       For example:
+
+              "Dupree:style=Regular:slant=0:weight=80:width=100"
+
+       See the sources on the SEE ALSO section to know more about Fontconfig,
+       how to configure it (using its XML configuration files) and how to
+       match fonts (using its pattern string syntax).
+
+       We'll need to include a new header in our source:
+
+              #include <X11/Xft/Xft.h>
+
+       When compiling, we may need to specify a new directory to our search
+       path for included files.  This directory contains the headers for
+       freetype2, a library used by Xft to do font rasterization.
+
+              -I/usr/include/freetype2
+
+       In OpenBSD, this should be:
+
+              -I/usr/X11R6/include/freetype2
+
+       When linking, we'll need to link to fontconfig and Xft.
+
+              -lfontconfig -lXft
+
+   Open the Font
+       First, we need to open a XftFont.  We'll write the function openfont()
+       that takes a font name and returns a pointer to a XftFont.  We'll go
+       through this function in parts.
+
+              static XftFont *openfont(const char *fontname) {
+
+       First, we need FontConfig to parse our pattern string and generate the
+       internal data structure of the pattern.  We use the FcNameParse(3) for
+       that.  It takes the font name as argument and returns a pointer to a
+       FcPattern.  All fontconfig functions and data types begin with Fc*.  We
+       need to check whether this pointer is null to test for errors.  We are
+       using functions from <err.h> to handle errors.
+
+                      FcPattern *pattern = FcNameParse(fontname);
+                      if (pattern == NULL)
+                              errx(1, "openfont: could not parse font name");
+
+       The FcPattern structure contains our search pattern, but it is not
+       ready yet.  We must ask fontconfig to fill in missing items.  We need
+       to call FcDefaultSubstitute(3) on our pattern to supply default values
+       for underspecified patterns (for example, if the weight and slant are
+       not specified, they will be set to Medium and Roman, respectively).  We
+       also need to call FcConfigSubstitute(3) to substitute items based on
+       the user's fontconfig configuration.  It receives a pointer to a
+       configuration structure, which in our case is NULL (to use the default
+       configuration); the pattern to be filled; and the kind of operations we
+       want to perform, which in our case is FcMatchPattern (pattern
+       operations).  FcDefaultSubstitute(3) returns void, and
+       FcConfigSubstitute(3) returns either FcTrue (in success) or FcFalse (in
+       case of allocation failure), which are constants of type FcBool.
+
+                      FcDefaultSubstitute(pattern);
+                      FcBool status = FcConfigSubstitute(NULL, pattern, FcMatchPattern);
+                      if (status == FcFalse)
+                              errx(1, "openfont: could not perform pattern substitution");
+
+       Now, we need to find a font matching our pattern. We use FcFontMatch(3)
+       for that.  It takes a pointer to a configuration structure (which in
+       our case is NULL), the search pattern, and a pointer to a FcResult
+       variable that will get the result of the matching.  This FcResult can
+       be FcResultNoMatch, FcResultOutOfMemory, etc, depending on the error.
+       What matter to us is whether it is FcResultMatch (indicating success).
+       This function also returns a pointer to a FcPattern structure (this
+       kind of structure can store either a searching pattern or a matching
+       pattern).
+
+                      FcResult result;
+                      FcPattern *match = FcFontMatch(NULL, pattern, &result);
+                      if (match == NULL || result != FcResultMatch)
+                              errx(1, "openfont: could not find font matching pattern");
+
+       Finally, we can open the font into a XftFont structure with the
+       XftFontOpenPattern(3) function call.
+
+                      XftFont *font = XftFontOpenPattern(dpy, match);
+                      if (font == NULL)
+                              errx(1, "openfont: could not open font");
+
+       Before we return the font to the calling function, we need to free the
+       created patterns with FcPatternDestroy(3).
+
+                      FcPatternDestroy(pattern);
+                      FcPatternDestroy(match);
+
+       Now we can return the font.
+
+                      return font;
+              }
+
+       Phew, that's a lot of calls!  But we can reduce that.  Xft provides
+       some convenience wrapper functions that call fontconfig functions for
+       us.  The first of them is XftFontMatch(3), which can replace the calls
+       to FcDefaultSubstitute(3), FcConfigSubstitute(3) and FcFontMatch(3).
+       The second of them is XftFontOpenName(3), which can replace the entire
+       openfont() function.  Why have we taken the longest path? For
+       completeness' sake and educational purposes, of course.
+
+       Also, we need to remember to close the font later with XftFontClose(3).
+
+   Allocate the Color
+       Xft drawing functions do not use a GC (graphics context) to get the
+       foreground color of the glyphs.  Instead, we need to allocate a
+       XftColor with XftColorAllocName(3) or other color allocation function.
+
+       This function takes the default visual and colormap.  We get them using
+       the DefaultVisual(3) and DefaultColormap(3) macros.
+
+       We call this function in the wrapper function alloccolor(), see the
+       source code of xoutput to see how it works.
+
+   XftDraw
+       Xft drawing functions do not take as argument an X Drawable such as a
+       Pixmap.  Instead, it takes a pointer to an XftDraw, a structure that
+       contains a Drawable and related information such as the Display, the
+       Visual and the Colormap.  We create an XftDraw with XftDrawCreate(3).
+
+              XftDraw *draw = XftDrawCreate(dpy, pixmap, visual, colormap);
+
+       Drawing into this XftDraw will actually draw into the Drawable (the
+       Pixmap, in our case).
+
+       An XftDraw can be freed with XftDrawDestroy(3).  We can free it right
+       after drawing the text.
+
+   Text Extents
+       It may be necessary to get the extents of the drawn text before drawing
+       it.  We use XftTextExtentsUtf8(3) to get the size of the text that will
+       be drawn.  It takes the Display, XftFont, the string and its size and a
+       pointer to a XGlyphInfo structure into which it will return the extents
+       of the drawing.
+
+              XGlyphInfo ext;
+              XftTextExtentsUtf8(dpy, font, text, strlen(text), &ext);
+
+       A XGlyphInfo structure contains the .x, .y, .width and .height members,
+       that gets the position and size of the drawing.  It also contains the
+       .xOff and .yOff members, that gets the position of the next glyph to
+       be drawn if the text continues.
+
+   Draw text
+       Finally, we can draw text into our Drawable (via an XftDraw).  To do
+       that, we call XftDrawStringUtf8(3).  It takes a pointer to an XftDraw,
+       a pointer to an XftColor, a pointer to an XftFont, the x and y position
+       of the baseline of the text to be drawn, and the text string and its
+       length.
+
+              XftDrawStringUtf8(draw, color, font, x, y, text, strlen(text));
+
+       In our case, we draw once into the pixmap (via an XftDraw) and then
+       copy its content into the window when we get an Expose event.
+
+   Closing Stuff
+       When we're done, we free the XftDraw if we haven't freed it yet.  We
+       also need to free the XftColor and the XftFont with XftColorFree(3)
+       and XftFontClose(3).
+
+ENVIRONMENT
+       The following environment variables affect the execution of xoutput.
+
+       DISPLAY
+              The display to start xnotify on.
+
+BUGS
+       No support to fallback fonts.  If a glyph does not exist in the font,
+       it will be drawn as the missing glyph (generally a box).
+
+SEE ALSO
+       Xft(3)
+
+       https://wiki.archlinux.org/index.php/Font_configuration
+
+       https://www.freedesktop.org/software/fontconfig/fontconfig-devel/t1.html
+
+       https://www.x.org/releases/current/doc/xorg-docs/fonts/fonts.html
