@@ -55,9 +55,17 @@ FILES
               A window that reads the characters the user types and print them.
               Lesson: Introduction to X Input Method.
 
-       xwrite/
-              A window that displays the string passed as argument.
+       xoutput1/
+              Display text on window.
+              Lesson: Introduction to core X11 font system.
+
+       xoutput2/
+              Display text on window.
               Lesson: Introduction to Xft.
+
+       xoutput3/
+              Display text on window.
+              Lesson: Introduction to Xft and font fallback.
 
 BUGS
        Some paragraphs were copied as is from other sources when I was

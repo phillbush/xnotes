@@ -14,7 +14,6 @@
 
 static Display *dpy;
 static Window root;
-static Window root;
 static int screen;
 static int depth;
 
