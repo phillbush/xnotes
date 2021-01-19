@@ -106,7 +106,7 @@ run(GC gc, Pixmap pix)
 	}
 }
 
-/* xhello: create and display a basic window with default white background */
+/* xoutput: display text on window */
 int
 main(int argc, char *argv[])
 {

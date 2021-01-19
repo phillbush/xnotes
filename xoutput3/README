@@ -1,0 +1,238 @@
+XOUTPUT(1)                          X Notes                         XOUTPUT(1)
+
+NAME
+       xoutput - display text on window
+
+SYNOPSIS
+       xoutput string
+
+DESCRIPTION
+       xoutput displays a window containing the text passed as argument
+       centered in it.  xoutput reads only one argument, so remember to quote
+       a string containing spaces for the shell to not break it into several
+       arguments.
+
+       The window can be closed by clicking on it.
+
+       The objective of this program is to handle multiple fonts using
+       fontconfig and Xft.
+
+CONCEPTS
+       Our last version of xoutput was limited to one font.  Thus, if a glyph
+       were not supported by a font, this glyph would not be drawn; instead a
+       replacement glyph, probably a box, was drawn in its place.  Differently
+       from the core X11 text drawing function we used in the first version of
+       xoutput (which used a fontset to get glyphs from) Xft uses a single
+       font.  There is not an API within Xft to switch among multiple fonts.
+       So we have to write in our code a function that does that.
+
+       In this version of xoutput we're using a manually selected set of fonts.
+       So, if you want to display Latin and Japanese characters, specify fonts
+       supporting both Latin and Japanese charsets.  In the code, I specified
+       three fonts: monospace, DejaVu Sans Mono, and NotoSans Mono CJK HK
+       (check the fontnames[] array).  Your system may not have those fonts,
+       so adapt this list to your system.  In a next version of xoutput,
+       we'll use fontconfig to generate for us a fontset with the default user
+       configuration.
+
+   The Fontset
+       Differently from our previous version, fontnames now is an array of
+       strings, which has the names of the fonts we'll use.
+
+       There are two new data types we create: FontEntry and FontSet.  FontSet
+       contains just an array of FontEntry and the number of elements in this
+       array.  A FontEntry contains a FcPattern, a FcCharSet, a XftFont and a
+       integer flag.  Since we specified three fonts in fontnames[], (you can
+       specify more) this array will have three FontEntry's.
+
+              typedef struct FontEntry {
+                      FcPattern *match;
+                      FcCharSet *charset;
+                      XftFont *font;
+                      int open;
+              } FontEntry;
+
+       FcPattern *match;
+              This is the pattern matching a font we have specified.
+
+       FcCharSet *charset;
+              A FcCharSet contains the set of Unicode characters in the font.
+              We will use this element to check whether a given character can
+              be drawn using a given font.
+
+       XftFont *font;
+              This is the actual font we open using XftFontOpenPattern(3).  We
+              will not open all the fonts when we create the fontset. Instead,
+              we will open fonts on demand: if we want to draw a glyph, and a
+              font is the first one to support this glyph, we'll open this
+              font and use it.
+
+       int open;
+              Just a flag that is set to nonzero when we try to open a font.
+              We use it to not try to open a font twice when we could not open
+              it a first time.
+
+       There are other ways to specify a fontset.  You can use a linked list,
+       for example.  Since we will traverse the fontset linearly, from begin
+       to end, looking for a font that supports a character, a linked list is
+       also feasible.
+
+   Create the Font Set
+       We'll write a function createfontset() to create a font set.  First we
+       allocate a FontSet and allocate an array of FontEntry's in it, and set
+       fontset->nfonts to the number of fonts we have.
+
+       Now, we loop through the entries of the array of FontEntry's.  Here is
+       the code for this loop, line by line.
+
+       First, we set the members of the FontEntry to zeroes and nulls.  A NULL
+       .match and .charset members indicate that we could not find a match to
+       this font entry.  The .font and .open members will be zero and NULL for
+       now until we open the fonts on demand.
+
+              fontset->fonts[i].open = 0;
+              fontset->fonts[i].font = NULL;
+              fontset->fonts[i].match = NULL;
+              fontset->fonts[i].charset = NULL;
+
+       Then, we try to parse the i-th font name and open a pattern on it.
+       Just like we have done in the previous version.  But now, instead of
+       exiting on error, we warn that a font name could not be parsed, and
+       continue on the fontset creation.
+
+              FcPattern *pattern = FcNameParse(fontnames[i]);
+              if (pattern == NULL) {
+                      warnx("openfont: could not parse font name");
+                      continue;
+              }
+
+       Our pattern is not ready yet.  We do the required substitutions with
+       fontconfig substitute functions.  If we could not perform them, we warn
+       and destroy the pattern we have created, and continue.
+
+              FcDefaultSubstitute(pattern);
+              FcBool status = FcDefaultSubstitute(NULL, pattern, FcMatchPattern);
+              if (status == FcFalse) {
+                      warnx("openfont: could not perform pattern substitution");
+                      FcPatternDestroy(pattern);
+                      continue;
+              }
+
+       After we have done the substitutions, we can find a font matching our
+       pattern.  If we couldn't find, we warns, destroy the searching pattern
+       and continue.
+
+              FcResult result;
+              FcPattern *match = FcFontMatch(NULL, pattern, &result);
+              if (match == NULL || result != FcResultMatch) {
+                      warnx("openfont: could not find font matching pattern");
+                      FcPatternDestroy(pattern);
+                      continue;
+              }
+
+       Then, we need to get the character sets the font support.  We use the
+       fontconfig function FcPatternGetCharSet(3).  Its second argument is the
+       name of the entry we are interested in (the charset).  And the third
+       argument must be zero.  They are necessary because FcPatternGetCharSet
+       is a wrapper around FcPatternGet, which returns an arbitrary entry from
+       a match pattern.  We should not free the charset, as the value returned
+       in it does not point to a copy of the entry, but to the entry itself.
+
+              FcCharSet *charset = NULL
+              result = FcPatternGetCharSet(match, FC_CHARSET, 0, &charset);
+              if (charset == NULL || result != FcResultMatch) {
+                      warnx("openfont: could not get charset of font");
+                      FcPatternDestroy(pattern);
+                      FcPatternDestroy(match);
+                      continue;
+              }
+
+       Finally we set the FontEntry's match and charset members to what we
+       have get in this iteration of the loop.
+
+              fontset->fonts[i].match = match;
+              fontset->fonts[i].charset = charset;
+
+       And we can destroy the search pattern.  We should not destroy match
+       pattern, as we will use that to refer to the font when we open it.
+
+              FcPatternDestroy(pattern);
+
+       We free the malloc'ed font set with destroyufontset().
+
+   Draw the text
+       Our drawing function now calls drawtext(), a function we create to
+       check character-by-character in our string for the font that support
+       it.
+
+       There are two loops, the outer one loops through the string while it
+       contains a character.  The inner loop also loops through the string
+       while it contains a character, but also while the current font to use
+       is equal to the next font to use.
+
+       In this inner loop we get the next UTF-8 character using a call to
+       getnextutf8char().  Then we get the font, from the fontset that
+       supports it.  If this font is different from the one supporting the
+       previous character, we exit the loop.
+
+       Out of the inner loop, we get the length of the part of the string that
+       can be drawn using the current font, and draw this part of the string.
+
+       Next we get the position where the next part of the string should be
+       drawn in the next iteration.  We use XftTextExtentsUtf8 for it.  And
+       increment the x position.
+
+       Finally, we make the string point to the next part of it.
+
+       There is also a function, called textextents that get the size of the
+       drawn text.  In fact, its structure is similar to drawtext.  We will
+       merge those two functions in the next version of xoutput.
+
+   Get Font Supporting UTF-8 Character
+       The function getfontucode loops through our fontset looking for a font
+       that supports the given UTF-8 character.
+
+       In each iteration of the loop, we check whether charset is NULL, if it
+       is, we could not have got it in the function that creates the fontset.
+       But if we have a charset for the current font, then we use the function
+       FcCharSetHasChar to check whether the font's charset contains the given
+       UTF-8 char.
+
+       If the charset contains the given character, then we test whether we
+       have opened the font.  If we haven't we open it.  Then we return the
+       font.
+
+       If no font could be found to support the character, we still have to
+       return a font.  In a second loop, we return the first font that we
+       found.
+
+       If no font was found, we return NULL.  This case will be handled in
+       drawtext().  If getfontucode returns NULL, we exit on error.
+
+   Get Next UTF-8 character.
+       This function is a tricky one that requires knowledge of the UTF-8
+       encoding and some Unicode blocks, like the surrogate halves.
+
+       This function takes a string and a pointer to string.  It returns a
+       FcChar32, which is fontconfig's type for a 32-bit character (an UTF-8
+       character can have at most 32 bits).  The returned value is the code
+       point for the first UTF-8 character in the first string passed as
+       argument.  It also return in the second string the pointer to the
+       next UTF-8 character.
+
+ENVIRONMENT
+       The following environment variables affect the execution of xoutput.
+
+       DISPLAY
+              The display to start xnotify on.
+
+BUGS
+       The programmer (or user) has to predict which characters will be drawn
+       and specify the list of fonts supporting those characters.  It would be
+       better to get this list of fonts from the set of fonts the user has
+       installed.
+
+SEE ALSO
+       Xft(3)
+
+       https://www.freedesktop.org/software/fontconfig/fontconfig-devel/t1.html

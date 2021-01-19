@@ -63,7 +63,11 @@ FILES
 
        xoutput3/
               Display text on window.
-              Lesson: Introduction to Xft and font fallback.
+              Lesson: Using Xft with manually created fontset.
+
+       xoutput4/
+              Display text on window.
+              Lesson: Using Xft with fontset provided by fontconfig.
 
 BUGS
        Some paragraphs were copied as is from other sources when I was

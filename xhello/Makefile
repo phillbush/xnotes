@@ -6,7 +6,7 @@ INCS = -I/usr/X11R6/include
 LIBS = -L/usr/X11R6/lib -lX11
 
 CC = cc
-CFLAGS = -Wall -Wextra ${INCS}
+CFLAGS = -g -O0 -Wall -Wextra ${INCS}
 LDFLAGS = ${LIBS}
 
 all: ${PROG}

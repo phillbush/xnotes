@@ -122,6 +122,8 @@ draw(Drawable pix, XftFont *font, XftColor *color, const char *text)
 	XftTextExtentsUtf8(dpy, font, text, len, &ext);
 	x = (WIDTH - ext.width) / 2;
 	y = (HEIGHT + ext.height) / 2;
+
+	/* draw text */
 	XftDrawStringUtf8(draw, color, font, x, y, text, len);
 
 	XftDrawDestroy(draw);
@@ -147,7 +149,7 @@ run(GC gc, Pixmap pix)
 	}
 }
 
-/* xhello: create and display a basic window with default white background */
+/* xoutput: display text on window */
 int
 main(int argc, char *argv[])
 {
