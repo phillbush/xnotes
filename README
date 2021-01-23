@@ -11,7 +11,7 @@ DESCRIPTION
        sources.  I recomment you to use Guy Keren's tutorial and Adrian Nye's
        book (and the man pages, of course).
 
-       Each directory contains a program that teaches a lession.  Begin with
+       Each directory contains a program that teaches a lesson.  Begin with
        xhello, as it is teaches the basics of Xlib programming.  All lessons
        are introductions; you must refer to the manuals, when available.
 
